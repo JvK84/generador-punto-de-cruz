@@ -64,37 +64,45 @@ def process_image(image_path, width_stitches):
         
     return grid, used_colors, width_stitches, height_stitches
 
+from reportlab.lib.pagesizes import A4, landscape, portrait
+
 def create_pdf(output_filename, grid, used_colors, width, height, original_filename):
-    c = canvas.Canvas(output_filename, pagesize=A4)
+    # Determinar orientación óptima
+    if width > height:
+        page_size = landscape(A4)
+        PAGE_WIDTH, PAGE_HEIGHT = page_size
+    else:
+        page_size = portrait(A4)
+        PAGE_WIDTH, PAGE_HEIGHT = page_size
+
+    c = canvas.Canvas(output_filename, pagesize=page_size)
     c.setTitle(f"Patrón de Punto de Cruz - {original_filename}")
+    
+    # Configuración de márgenes reducidos para ocupar más hoja
+    MARGIN = 10 * mm
+    TITLE_HEIGHT = 15 * mm # Espacio reservado para título
+    
+    DRAW_AREA_WIDTH = PAGE_WIDTH - 2 * MARGIN
+    DRAW_AREA_HEIGHT = PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT
     
     # --- PÁGINA 1: DIBUJO DEL PATRÓN ---
     # Calcular tamaño de celda
-    # Intentar usar el máximo espacio posible
     cell_w = DRAW_AREA_WIDTH / width
     cell_h = DRAW_AREA_HEIGHT / height
     cell_size = min(cell_w, cell_h)
     
-    # Centrar
+    # Centrar el grid en el área de dibujo
     grid_width = cell_size * width
     grid_height = cell_size * height
+    
     start_x = (PAGE_WIDTH - grid_width) / 2
-    # Empezar desde arriba
-    start_y = PAGE_HEIGHT - MARGIN
+    # El grid empieza justo debajo del título
+    start_y_grid = PAGE_HEIGHT - MARGIN - TITLE_HEIGHT
     
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(MARGIN, PAGE_HEIGHT - 15 * mm, f"Patrón: {original_filename}")
-    c.setFont("Helvetica", 10)
-    c.drawString(MARGIN, PAGE_HEIGHT - 20 * mm, f"Dimensiones: {width} x {height} puntos")
+    # Título más compacto
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(MARGIN, PAGE_HEIGHT - MARGIN - 5*mm, f"Patrón: {original_filename} ({width}x{height})")
     
-    # Ajustar start_y para dejar espacio al título
-    start_y_grid = start_y - 25 * mm
-    
-    # Si no cabe, avisar (simple check)
-    if grid_height > (start_y_grid - MARGIN):
-         # Reducir celda si es necesario o aceptar margen inferior menor
-         pass
-
     # Dibujar grid
     c.setLineWidth(0.1)  # Línea fina para la grilla
     c.setStrokeColorRGB(0.5, 0.5, 0.5) # Gris medio
@@ -104,22 +112,19 @@ def create_pdf(output_filename, grid, used_colors, width, height, original_filen
             dmc = grid[y][x]
             r, g, b = dmc['rgb']
             c.setFillColorRGB(r/255.0, g/255.0, b/255.0)
-            # Dibujar rect
-            # Coordenadas en PDF van de abajo a arriba
-            # Queremos dibujar la fila 0 arriba.
-            # pos_y de la fila y (siendo 0 la superior) = start_y_grid - (y+1)*cell_size
+            
             rect_y = start_y_grid - (y + 1) * cell_size
             rect_x = start_x + x * cell_size
             
             c.rect(rect_x, rect_y, cell_size, cell_size, fill=1, stroke=1)
             
-    # Opcional: Dibujar líneas de cuadrícula 10x10 más gruesas
+    # Líneas de cuadrícula 10x10 más gruesas
     c.setLineWidth(1.0)
     c.setStrokeColorRGB(0.2, 0.2, 0.2)
     
     # Líneas verticales
     for x in range(0, width + 1, 10):
-        if x == 0 or x == width: continue # Bordes ya cubiertos o no necesarios si queremos limpio
+        if x == 0 or x == width: continue 
         line_x = start_x + x * cell_size
         bottom_y = start_y_grid - height * cell_size
         c.line(line_x, start_y_grid, line_x, bottom_y)
